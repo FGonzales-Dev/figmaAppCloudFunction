@@ -96,3 +96,40 @@ export const getTestData2 = functions.https.onRequest(async (req, res) => {
   }
 });
 
+export const copyUserId = functions.https.onRequest(async (req, res) => {
+  res.set("Access-Control-Allow-Origin", "*");
+  res.set("Access-Control-Allow-Methods", "GET, POST");
+  try {
+      // Get the main collection
+      const mainCollectionRef = firestore.collection("user");
+      const mainCollectionSnapshot = await mainCollectionRef.get();
+      const mainCollectionData = mainCollectionSnapshot.docs.map((doc) => ({
+          id: doc.id,
+          data: doc.data(),
+      }));
+      for (const doc of mainCollectionData) {
+          try {
+              const subcollectionRef = mainCollectionRef.doc(doc.id).collection("url");
+              const subcollectionSnapshot = await subcollectionRef.get();
+              subcollectionSnapshot.forEach(async (urlDoc) => {
+                await urlDoc.ref.update({
+                    userId: doc.id,
+                });
+            });
+              // const profileData = subcollectionSnapshot.docs.map((doc) => doc.data())[0]; // Assuming only one document in profile collection
+              // await mainCollectionRef.doc(doc.id).set({
+              //     email: profileData.email,
+              //     name: profileData.name,
+              // }, {merge: true}); // Merge data instead of overwriting
+              // console.log(`Profile moved for user ${doc.id}`);
+          } catch (error) {
+              console.error(`Error moving profile for user ${doc.id}:`, error);
+              // Handle errors gracefully
+          }
+      }
+      res.json({success: true, message: "Data migration successful"});
+  } catch (error) {
+      res.status(500).json({success: false, message: "Internal server error"});
+      console.error("Error:", error);
+  }
+});
